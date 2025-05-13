@@ -1,0 +1,6 @@
+// LocalStorage yapısı örneği
+{
+  "attendance": {
+    "2025-05-19": ["Ali", "İlker", "Mehmet"]
+  }
+}
