@@ -1,12 +1,13 @@
-futbolkadro/
-├── index.html         // Ana sayfa
-├── players.html       // Oyuncu ekleme/silme
-├── attendance.html    // Katılım formu (Pazartesi)
-├── teams.html         // Takımların oluşturulması ve gösterilmesi
+KickoffManager/
+├── index.html # Ana sayfa
+├── players.html # Oyuncu ekleme / silme ekranı
+├── attendance.html # Haftalık katılım formu (her Pazartesi)
+├── teams.html # Admin tarafından takım oluşturma sayfası
+├── history.html # Oyuncuların geçmiş katılım takibi
 ├── js/
-│   ├── storage.js     // LocalStorage işlemleri
-│   ├── players.js     // Oyuncu yönetimi
-│   ├── attendance.js  // Katılım formu
-│   └── teams.js       // Takım oluşturma
+│ ├── storage.js # LocalStorage işlemleri
+│ ├── players.js # Oyuncu yönetimi kodları
+│ ├── attendance.js # Katılım formu kodları
+│ └── teams.js # Takım atama ekranı kodları
 ├── css/
-│   └── style.css      // Temel stiller
+│ └── style.css # Temel stil dosyası
