@@ -1,0 +1,23 @@
+<!-- history.html -->
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Katılım Geçmişi</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <h1>Oyuncu Katılım Geçmişi</h1>
+
+  <select id="playerSelect">
+    <option value="">Oyuncu Seç</option>
+  </select>
+
+  <h2 id="playerNameTitle"></h2>
+  <ul id="playerHistory"></ul>
+
+  <script src="js/storage.js"></script>
+  <script src="js/history.js"></script>
+</body>
+</html>
