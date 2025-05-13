@@ -1,4 +1,4 @@
-# futbolkadro
+# KickoffManager
 Haftalık futbol katılım ve takım oluşturma uygulaması
 
 ---
