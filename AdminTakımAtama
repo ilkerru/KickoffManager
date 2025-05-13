@@ -1,0 +1,28 @@
+<!-- teams.html -->
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Takım Atama (Admin)</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <h1>Takım Atama Paneli</h1>
+  <p>Hafta: <span id="weekDisplay"></span></p>
+
+  <form id="teamForm"></form>
+
+  <button id="saveTeams">Takımları Kaydet</button>
+
+  <h2>Mevcut Seçimler</h2>
+  <div>
+    <strong>Takım A:</strong> <ul id="teamADisplay"></ul>
+    <strong>Takım B:</strong> <ul id="teamBDisplay"></ul>
+    <strong>Yedek:</strong> <ul id="subsDisplay"></ul>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/teams.js"></script>
+</body>
+</html>
