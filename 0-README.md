@@ -3,6 +3,9 @@ Haftalık futbol katılım ve takım oluşturma uygulaması
 
 ---
 
+
+---
+
 ## 🚀 Özellikler
 
 - ✅ Oyuncu listesi ekleme / silme
@@ -51,14 +54,4 @@ Projeyi GitHub Pages ile kolayca yayına alabilirsiniz:
 - [ ] İstatistik ekranı (katılım oranları, skorlar, vs.)
 - [ ] Takım renkleri ve formaları (görsel destek)
 
----
 
-## 🧑‍💻 Katkıda Bulun
-
-Pull request göndermekten çekinmeyin. Her türlü katkıya açığız!
-
----
-
-## 📝 Lisans
-
-MIT Lisansı
