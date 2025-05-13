@@ -31,11 +31,11 @@ Haftalık futbol katılım ve takım oluşturma uygulaması
 
 Projeyi GitHub Pages ile kolayca yayına alabilirsiniz:
 
-1. GitHub’da bir repo oluşturun (örneğin: `futbolkadro`)
+1. GitHub’da bir repo oluşturun (örneğin: `KickoffManager`)
 2. Tüm dosyaları oraya yükleyin
 3. GitHub repo → Settings → Pages → Source: `main` /root seçin
 4. Projeniz şu adreste çalışır:  
-   `https://kullaniciadi.github.io/futbolkadro/`
+   `https://kullaniciadi.github.io/KickoffManager/`
 
 ---
 
