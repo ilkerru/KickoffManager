@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KickoffManager — Haftalık futbol katılım & takım oluşturma</title>
+  <meta name="description" content="KickoffManager: Haftalık futbol katılımı alma, oyuncu listesi yönetimi, admin tarafından takım oluşturma ve geçmiş görüntüleme. Veriler localStorage ile tarayıcıda saklanır." />
+  <style>
+    :root{
+      --bg:#0b1220; --panel:#121a2b; --muted:#b7c4df; --ink:#e6ebf3; --line:#1f2a44; --accent:#7aa2ff; --ok:#3ddc97;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+    a{color:inherit}
+    .container{max-width:1000px;margin:0 auto;padding:20px}
+    header.hero{padding:36px 0 8px}
+    .badge{display:inline-flex;gap:.5ch;align-items:center;padding:6px 10px;border:1px dashed var(--line);border-radius:999px;color:var(--muted);font-size:12px}
+    h1{font-size:32px;margin:12px 0 8px}
+    .lead{color:var(--muted);margin:0 0 16px}
+    .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+    .card{display:block;padding:16px;border-radius:16px;background:var(--panel);border:1px solid var(--line);text-decoration:none;transition:transform .08s ease,border-color .15s ease}
+    .card:hover{transform:translateY(-3px);border-color:#2e3d66}
+    .card h3{margin:0 0 6px;font-size:18px}
+    .card p{margin:0;color:var(--muted);font-size:14px}
+
+    section{margin:28px 0}
+    section h2{font-size:20px;margin:0 0 12px}
+    ul{padding-left:20px;margin:0}
+    li+li{margin-top:6px}
+    .ok{color:var(--ok)}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .note{color:var(--muted);font-size:13px}
+    .cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .btn{display:inline-flex;align-items:center;gap:.6ch;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel);text-decoration:none}
+    .btn:hover{border-color:#2e3d66}
+    footer{margin:32px 0 12px;color:var(--muted);font-size:12px}
+    code{background:#0f172a;border:1px solid var(--line);padding:.1rem .35rem;border-radius:.5rem}
+    pre{background:#0f172a;border:1px solid var(--line);padding:12px;border-radius:12px;overflow:auto}
+  </style>
+</head>
+<body>
+  <header class="hero container">
+    <span class="badge">🏈 <span>KickoffManager</span></span>
+    <h1>Haftalık futbol katılım & takım oluşturma uygulaması</h1>
+    <p class="lead">Oyuncuları yönetin, pazartesileri katılım alın, admin olarak takımları atayın ve geçmişi takip edin. <strong>Sunucu yok</strong>, tüm veriler tarayıcınızın <code class="mono">localStorage</code>'ında saklanır.</p>
+
+    <div class="cta">
+      <a class="btn" href="players.html">👤 Oyuncular</a>
+      <a class="btn" href="attendance.html">🗓️ Katılım</a>
+      <a class="btn" href="teams.html">🧩 Takımlar</a>
+      <a class="btn" href="history.html">📜 Geçmiş</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section aria-labelledby="h-quick">
+      <h2 id="h-quick">🔗 Hızlı Erişim</h2>
+      <div class="grid">
+        <a class="card" href="players.html">
+          <h3>Oyuncular</h3>
+          <p>Oyuncu ekleme / silme</p>
+        </a>
+        <a class="card" href="attendance.html">
+          <h3>Katılım</h3>
+          <p>Her Pazartesi “katılıyorum / katılmıyorum”</p>
+        </a>
+        <a class="card" href="teams.html">
+          <h3>Takımlar</h3>
+          <p>Admin tarafından A / B / Yedek atama</p>
+        </a>
+        <a class="card" href="history.html">
+          <h3>Geçmiş</h3>
+          <p>Haftaya özel kayıt ve oyuncu geçmişi</p>
+        </a>
+      </div>
+      <p class="note" style="margin-top:10px">İpucu: Farklı bir cihaz/tarayıcı kullanırsanız verileriniz taşınmaz. Yedeklemek için ayarlar sayfası ekleyebilirsiniz.</p>
+    </section>
+
+    <section aria-labelledby="h-features">
+      <h2 id="h-features">🚀 Özellikler</h2>
+      <ul>
+        <li><span class="ok">✅</span> Oyuncu listesi ekleme / silme</li>
+        <li><span class="ok">✅</span> Her hafta oyunculardan “katılıyorum / katılmıyorum” bilgisi alma</li>
+        <li><span class="ok">✅</span> Admin tarafından elle takım atama (Takım A / B / Yedek)</li>
+        <li><span class="ok">✅</span> Haftaya özel takım kaydı ve geçmiş görüntüleme</li>
+        <li><span class="ok">✅</span> Oyuncu katılım geçmişi görüntüleme</li>
+        <li><span class="ok">✅</span> Veriler <code class="mono">localStorage</code> ile tarayıcıda saklanır</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="h-usage">
+      <h2 id="h-usage">🔧 Kullanım</h2>
+      <ol>
+        <li>Tüm dosyaları tek bir klasöre kopyalayın.</li>
+        <li><code class="mono">players.html</code> ile oyuncuları ekleyin.</li>
+        <li>Her Pazartesi <code class="mono">attendance.html</code> üzerinden katılım alın.</li>
+        <li><code class="mono">teams.html</code> ile admin olarak takımları oluşturun.</li>
+        <li><code class="mono">history.html</code> ile oyuncuların geçmiş katılım durumlarını görüntüleyin.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="h-deploy">
+      <h2 id="h-deploy">🌐 Yayınlama (GitHub Pages)</h2>
+      <ol>
+        <li>GitHub’da bir repo oluşturun (ör. <code class="mono">KickoffManager</code>).</li>
+        <li>Tüm dosyaları bu repoya yükleyin.</li>
+        <li>Repo → <em>Settings</em> → <em>Pages</em> → <strong>Source: main / (root)</strong> seçin.</li>
+      </ol>
+      <p>Projeniz şu adreste çalışır:</p>
+      <pre><code>https://kullaniciadi.github.io/KickoffManager/</code></pre>
+      <p class="note">Not: <code class="mono">kullaniciadi</code> kısmını kendi GitHub kullanıcı adınızla değiştirin.</p>
+    </section>
+
+    <section aria-labelledby="h-reqs">
+      <h2 id="h-reqs">📌 Gereksinimler</h2>
+      <ul>
+        <li>Modern bir web tarayıcısı (Chrome, Firefox, Edge, Safari)</li>
+        <li>Sunucu gerekmez (tamamen istemci taraflı)</li>
+        <li>Mobil uyumlu HTML5 yapısı (responsive)</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="h-ideas">
+      <h2 id="h-ideas">🛠️ Geliştirme Önerileri</h2>
+      <ul>
+        <li>Firebase veya Supabase ile gerçek veritabanı bağlantısı</li>
+        <li>Giriş sistemi ve yetkilendirme (admin vs oyuncu)</li>
+        <li>İstatistik ekranı (katılım oranları, skorlar vb.)</li>
+        <li>Takım renkleri ve formaları (görsel destek)</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="h-structure">
+      <h2 id="h-structure">📁 Dosya Yapısı (öneri)</h2>
+      <pre><code>KickoffManager/
+├─ index.html
+├─ players.html
+├─ attendance.html
+├─ teams.html
+└─ history.html</code></pre>
+    </section>
+  </main>
+
+  <footer class="container">
+    <p>© <span id="y"></span> KickoffManager • <span class="note">Açık kaynak yayınlamaya uygundur.</span></p>
+  </footer>
+
+  <noscript>
+    <div class="container" style="color:#ffb4b4">Bu uygulamanın bazı bölümleri JavaScript olmadan sınırlı çalışır.</div>
+  </noscript>
+
+  <script>
+    // Yılı otomatik yaz
+    document.getElementById('y').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
