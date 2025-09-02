@@ -1,28 +1,368 @@
-<!-- teams.html -->
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Takım Atama (Admin)</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KickoffManager — Takım Atama</title>
+  <style>
+    :root{--bg:#0b1220;--panel:#121a2b;--muted:#b7c4df;--ink:#e6ebf3;--line:#1f2a44;--accent:#7aa2ff;--warn:#ffb347;--bad:#ff6b6b;}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45}
+    .container{max-width:1100px;margin:0 auto;padding:20px}
+    header{display:flex;flex-wrap:wrap;justify-content:space-between;gap:14px;align-items:center;margin-bottom:14px}
+    h1{font-size:24px;margin:0}
+    .meta{color:var(--muted);font-size:13px}
+    .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}
+    .card h2{margin:0 0 10px;font-size:18px}
+    .row{display:grid;grid-template-columns:1fr 1.2fr;gap:10px;align-items:center;margin:8px 0}
+    .row label{font-size:14px;color:var(--muted)}
+    select,button,.pill{background:#0f172a;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+    select{width:100%}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+    .pill{font-size:12px}
+    .warn{color:var(--warn)}
+    .bad{color:var(--bad)}
+    .ok{color:#3ddc97}
+    .footer{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:14px}
+    .help{color:var(--muted);font-size:13px;margin-top:4px}
+    .disabled label{opacity:.6}
+  </style>
 </head>
 <body>
-  <h1>Takım Atama Paneli</h1>
-  <p>Hafta: <span id="weekDisplay"></span></p>
+  <div class="container">
+    <header>
+      <h1>🧩 Takım Atama</h1>
+      <div class="meta">Toplam oyuncu: <span id="playerCount">0</span> • Tarih: <span id="today"></span></div>
+    </header>
 
-  <form id="teamForm"></form>
+    <div class="help">Her takım <strong>9 futbolcu</strong> içerir. Orta saha (OS) ve forvet (FW) sayısı kuralı: <strong>2 OS + 1 FW</strong> <em>veya</em> <strong>1 OS + 2 FW</strong>. (Toplam OS+FW = 3)</div>
 
-  <button id="saveTeams">Takımları Kaydet</button>
+    <section class="grid" id="teams">
+      <!-- Team cards injected by JS -->
+    </section>
 
-  <h2>Mevcut Seçimler</h2>
-  <div>
-    <strong>Takım A:</strong> <ul id="teamADisplay"></ul>
-    <strong>Takım B:</strong> <ul id="teamBDisplay"></ul>
-    <strong>Yedek:</strong> <ul id="subsDisplay"></ul>
+    <div class="footer">
+      <button id="saveBtn">💾 Kaydet</button>
+      <button id="clearBtn">♻️ Temizle</button>
+    </div>
+
+    <p class="help">Veriler tarayıcınızda (<code>localStorage</code>) saklanır. Oyuncu listesi <code>players.html</code> üzerinden yönetilir.</p>
   </div>
 
-  <script src="js/storage.js"></script>
-  <script src="js/teams.js"></script>
+<script>
+(function(){
+  const TEAM_KEYS = ["A", "B"]; // İsterseniz genişletin
+  const POSITIONS_BASE = [
+    { key: "gk", label: "Kaleci" },
+    { key: "lb", label: "Sol Bek" },
+    { key: "cb", label: "Libero" },
+    { key: "rb", label: "Sağ Bek" },
+    { key: "lw", label: "Sol Açık" },
+    { key: "rw", label: "Sağ Açık" },
+  ];
+  // OS/FW kuralı: (2 OS + 1 FW) veya (1 OS + 2 FW) ⇒ toplam 3 slot
+  const POSITIONS_OSFW = [
+    { key: "cm1", label: "Orta Saha 1", role: "OS" },
+    { key: "cm2", label: "Orta Saha 2", role: "OS" },
+    { key: "st1", label: "Forvet 1", role: "FW" },
+    { key: "st2", label: "Forvet 2", role: "FW" },
+  ];
+
+  const state = {
+    players: [], // {id,name}
+    teams: {},   // {A:{formation:"2OS1FW"|"1OS2FW", slots:{posKey: playerId|null}}, B:{...}}
+  };
+
+  const todayEl = document.getElementById('today');
+  todayEl.textContent = new Date().toLocaleDateString('tr-TR');
+
+  // Oyuncuları yükle (players.html'ün yazdığı yapıyı varsayıyoruz)
+  function loadPlayers(){
+    // Beklenen anahtar: 'players' = [{id, name}]
+    try{
+      const raw = localStorage.getItem('players');
+      if(raw){
+        const arr = JSON.parse(raw).filter(p=>p && p.name);
+        if (arr.length) return arr.map((p,i)=>({id:p.id ?? String(i+1), name:p.name}));
+      }
+    }catch(e){ console.warn('players parse', e); }
+    // Yedek örnekler (liste boşsa bir şeyler görünsün)
+    return [
+      {id:"p1", name:"Oyuncu 1"}, {id:"p2", name:"Oyuncu 2"}, {id:"p3", name:"Oyuncu 3"},
+      {id:"p4", name:"Oyuncu 4"}, {id:"p5", name:"Oyuncu 5"}, {id:"p6", name:"Oyuncu 6"},
+      {id:"p7", name:"Oyuncu 7"}, {id:"p8", name:"Oyuncu 8"}, {id:"p9", name:"Oyuncu 9"},
+      {id:"p10", name:"Oyuncu 10"}, {id:"p11", name:"Oyuncu 11"}, {id:"p12", name:"Oyuncu 12"}
+    ];
+  }
+
+  function defaultTeam(){
+    const slots = {};
+    [...POSITIONS_BASE, ...POSITIONS_OSFW].forEach(p=>slots[p.key]=null);
+    return { formation: '2OS1FW', slots, bench: [] };
+  }
+
+  function loadSaved(){
+    const key = currentWeekKey();
+    try{
+      const raw = localStorage.getItem('teams:'+key);
+      if(raw) return JSON.parse(raw);
+    }catch(e){ console.warn('teams parse', e); }
+    // başlangıç
+    const obj = {};
+    TEAM_KEYS.forEach(k=>obj[k]=defaultTeam());
+    return obj;
+  }
+
+  function currentWeekKey(){
+    const d = new Date();
+    // Haftayı yyyy-W## olarak sakla
+    const y = d.getFullYear();
+    const onejan = new Date(d.getFullYear(),0,1);
+    const week = Math.ceil((((d - onejan) / 86400000) + onejan.getDay()+1)/7);
+    return `${y}-W${String(week).padStart(2,'0')}`;
+  }
+
+  // UI — takım kartları
+  function render(){
+    const root = document.getElementById('teams');
+    root.innerHTML = '';
+
+    // Kullanılmış oyuncular seti (tüm aktif slotlardan)
+    const used = new Set();
+    for (const t of TEAM_KEYS){
+      const team = state.teams[t];
+      for (const [k,v] of Object.entries(team.slots)){
+        if (!isSlotEnabled(team, k)) continue; // devre dışı slotlar sayılmaz
+        if (v) used.add(v);
+      }
+    }
+
+    TEAM_KEYS.forEach(teamKey=>{
+      const team = state.teams[teamKey];
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      const h2 = document.createElement('h2');
+      h2.textContent = `Takım ${teamKey}`;
+      card.appendChild(h2);
+
+      // Formasyon seçici
+      const toolbar = document.createElement('div');
+      toolbar.className = 'toolbar';
+      const label = document.createElement('span');
+      label.className='pill';
+      label.textContent = 'Formasyon:';
+
+      const sel = document.createElement('select');
+      sel.innerHTML = `
+        <option value="2OS1FW">2 Orta Saha + 1 Forvet</option>
+        <option value="1OS2FW">1 Orta Saha + 2 Forvet</option>`;
+      sel.value = team.formation;
+      sel.addEventListener('change', ()=>{
+        team.formation = sel.value;
+        // Slot kurallarına uymayan seçimleri temizle
+        enforceFormation(team);
+        render();
+      });
+
+      toolbar.appendChild(label);
+      toolbar.appendChild(sel);
+      card.appendChild(toolbar);
+
+      // Pozisyonlar
+      const allPositions = [...POSITIONS_BASE, ...POSITIONS_OSFW];
+
+      allPositions.forEach(p=>{
+        const enabled = isSlotEnabled(team, p.key);
+        const row = document.createElement('div');
+        row.className = 'row' + (enabled ? '' : ' disabled');
+
+        const lab = document.createElement('label');
+        lab.textContent = p.label + (!enabled ? ' (pasif)' : '');
+
+        const pick = document.createElement('select');
+        pick.disabled = !enabled;
+
+        const curVal = team.slots[p.key];
+        const candidates = playerOptionsForSelect(curVal, used);
+        pick.appendChild(new Option('— Seçiniz —', ''));
+        candidates.forEach(opt=> pick.appendChild(new Option(opt.name, opt.id)));
+        pick.value = curVal || '';
+
+        pick.addEventListener('change', ()=>{
+          const prev = team.slots[p.key];
+          team.slots[p.key] = pick.value || null;
+          // Aynı oyuncu başka yerde seçiliyse kaldırma handled by used reconstruction on render
+          render();
+        });
+
+        row.appendChild(lab);
+        row.appendChild(pick);
+        card.appendChild(row);
+      });
+
+      // Bench (Yedek)
+      const benchRow = document.createElement('div');
+      benchRow.className = 'row';
+      const benchLab = document.createElement('label');
+      benchLab.textContent = 'Yedekler (opsiyonel)';
+      const benchSel = document.createElement('select');
+      benchSel.multiple = true;
+      benchSel.size = 4;
+
+      // Yedekler: kullanılmayan oyuncular
+      const usedNow = collectUsedPlayers();
+      const benchCandidates = state.players.filter(p=>!usedNow.has(p.id) || (team.bench||[]).includes(p.id));
+      benchSel.innerHTML = '';
+      benchCandidates.forEach(p=>{
+        const opt = new Option(p.name, p.id);
+        opt.selected = (team.bench||[]).includes(p.id);
+        benchSel.appendChild(opt);
+      });
+
+      benchSel.addEventListener('change', ()=>{
+        team.bench = Array.from(benchSel.selectedOptions).map(o=>o.value);
+      });
+
+      benchRow.appendChild(benchLab);
+      benchRow.appendChild(benchSel);
+      card.appendChild(benchRow);
+
+      // Durum/uyarı
+      const status = document.createElement('div');
+      const {ok, messages} = validateTeam(team);
+      status.className = 'help ' + (ok ? 'ok' : 'bad');
+      status.textContent = ok ? `Hazır: ${countActiveFilled(team)}/9 oyuncu` : `Uyarı: ${messages.join(' • ')}`;
+      card.appendChild(status);
+
+      document.getElementById('teams').appendChild(card);
+    });
+
+    document.getElementById('playerCount').textContent = state.players.length;
+  }
+
+  function playerOptionsForSelect(currentValue, used){
+    // Mevcut değer aynıysa listede tutulur.
+    return state.players.filter(p=>!used.has(p.id) || p.id===currentValue);
+  }
+
+  function isSlotEnabled(team, key){
+    if (key==='cm2' && team.formation==='1OS2FW') return false; // 1 OS
+    if (key==='st2' && team.formation==='2OS1FW') return false; // 1 FW
+    return true;
+  }
+
+  function enforceFormation(team){
+    if (team.formation==='1OS2FW'){ team.slots['cm2'] = null; }
+    if (team.formation==='2OS1FW'){ team.slots['st2'] = null; }
+  }
+
+  function collectUsedPlayers(){
+    const used = new Set();
+    for (const t of TEAM_KEYS){
+      const team = state.teams[t];
+      for (const [k,v] of Object.entries(team.slots)){
+        if (!isSlotEnabled(team, k)) continue;
+        if (v) used.add(v);
+      }
+    }
+    return used;
+  }
+
+  function countActiveFilled(team){
+    let cnt = 0;
+    for (const p of POSITIONS_BASE){ if (team.slots[p.key]) cnt++; }
+    if (team.formation==='2OS1FW'){
+      if (team.slots['cm1']) cnt++;
+      if (team.slots['cm2']) cnt++;
+      if (team.slots['st1']) cnt++;
+    } else {
+      if (team.slots['cm1']) cnt++;
+      if (team.slots['st1']) cnt++;
+      if (team.slots['st2']) cnt++;
+    }
+    return cnt;
+  }
+
+  function validateTeam(team){
+    const messages = [];
+    // OS/FW kuralı: aktif slot setine göre kontrol
+    const osCount = (team.formation==='2OS1FW') ? [team.slots['cm1'], team.slots['cm2']].filter(Boolean).length
+                                               : [team.slots['cm1']].filter(Boolean).length;
+    const fwCount = (team.formation==='2OS1FW') ? [team.slots['st1']].filter(Boolean).length
+                                               : [team.slots['st1'], team.slots['st2']].filter(Boolean).length;
+    const totalOSFW = osCount + fwCount;
+    if (team.formation==='2OS1FW' && !(osCount<=2 && fwCount<=1)) messages.push('Formasyon 2OS+1FW sınırını aşmayın');
+    if (team.formation==='1OS2FW' && !(osCount<=1 && fwCount<=2)) messages.push('Formasyon 1OS+2FW sınırını aşmayın');
+    if (totalOSFW>3) messages.push('OS+FW toplamı 3 olmalı');
+
+    // Toplam oyuncu 9 olmalı
+    const total = countActiveFilled(team);
+    if (total!==9) messages.push(`Toplam oyuncu ${total}/9`);
+
+    // Aynı oyuncu birden fazla yerde seçilemez (global)
+    const used = collectUsedPlayers();
+    // (Seçeneklerde zaten filtreliyoruz, ama güvenlik için basit bir kontrol)
+
+    return { ok: messages.length===0, messages };
+  }
+
+  function validateAll(){
+    const msgs = [];
+    // Çift seçim kontrolü
+    const seen = new Map(); // id -> where
+    for (const tk of TEAM_KEYS){
+      const team = state.teams[tk];
+      for (const [k,v] of Object.entries(team.slots)){
+        if (!isSlotEnabled(team, k)) continue;
+        if (v){
+          if (seen.has(v)) msgs.push(`${getPlayerName(v)} birden fazla yerde (${seen.get(v)} ve ${tk}:${k})`);
+          else seen.set(v, `${tk}:${k}`);
+        }
+      }
+    }
+    // Takım bazlı doğrulama
+    TEAM_KEYS.forEach(tk=>{
+      const v = validateTeam(state.teams[tk]);
+      if (!v.ok) msgs.push(`Takım ${tk}: ${v.messages.join(' • ')}`);
+    });
+    return msgs;
+  }
+
+  function getPlayerName(id){
+    const p = state.players.find(x=>x.id===id);
+    return p? p.name : id;
+  }
+
+  function save(){
+    const errors = validateAll();
+    if (errors.length){
+      alert('Kaydedilemedi:\n' + errors.join('\n'));
+      return;
+    }
+    const key = 'teams:'+currentWeekKey();
+    localStorage.setItem(key, JSON.stringify(state.teams));
+    alert('Kaydedildi ('+ key +')');
+  }
+
+  function clearAll(){
+    if(!confirm('Tüm seçimleri temizlemek istiyor musunuz?')) return;
+    TEAM_KEYS.forEach(k=> state.teams[k] = defaultTeam());
+    render();
+  }
+
+  // Init
+  state.players = loadPlayers();
+  document.getElementById('playerCount').textContent = state.players.length;
+  state.teams = loadSaved();
+
+  document.getElementById('saveBtn').addEventListener('click', save);
+  document.getElementById('clearBtn').addEventListener('click', clearAll);
+
+  // İlk render
+  render();
+})();
+</script>
 </body>
 </html>
