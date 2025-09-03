@@ -1,21 +1,234 @@
-<!-- attendance.html -->
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Katılım Formu</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KickoffManager — Katılım (Maç Günü Seçimli)</title>
+  <style>
+    :root{--bg:#0b1220;--panel:#121a2b;--muted:#b7c4df;--ink:#e6ebf3;--line:#1f2a44;--ok:#3ddc97;--bad:#ff6b6b}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+    .wrap{max-width:1000px;margin:0 auto;padding:20px}
+    header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:10px}
+    h1{margin:0;font-size:22px}
+    .meta{color:var(--muted);font-size:13px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+    label{color:var(--muted);font-size:14px}
+    input[type="date"],select,button,input[type="text"]{background:#0f172a;color:#e6ebf3;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+    button{cursor:pointer}
+    .row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center}
+    .list{display:flex;flex-direction:column;gap:8px}
+    .item{display:grid;grid-template-columns:1.2fr auto auto 1fr;gap:8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px}
+    .item:nth-child(odd){background:rgba(255,255,255,.02)}
+    .pill{border:1px solid var(--line);border-radius:999px;padding:4px 8px}
+    .counts{display:flex;gap:10px;align-items:center}
+    .ok{color:var(--ok)} .bad{color:var(--bad)}
+  </style>
 </head>
 <body>
-  <h1>Katılım Formu</h1>
-  <p>Hafta: <span id="weekDisplay"></span></p>
+<div class="wrap">
+  <header>
+    <h1>🗓️ Katılım</h1>
+    <div class="meta">Toplam oyuncu: <span id="playerCount">0</span></div>
+  </header>
 
-  <form id="attendanceForm"></form>
+  <div class="card">
+    <div class="row">
+      <div>
+        <label for="matchDate">Maç günü</label>
+        <input id="matchDate" type="date" />
+      </div>
+      <div>
+        <label>Hafta anahtarı</label>
+        <div class="pill" id="weekKey">—</div>
+      </div>
+      <div class="counts">
+        <div>✅ <span id="yesCount">0</span></div>
+        <div>❌ <span id="noCount">0</span></div>
+        <div>⏳ <span id="pendingCount">0</span></div>
+      </div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button id="allYes">Tümünü “Katılıyorum” yap</button>
+      <button id="allNo">Tümünü “Katılmıyorum” yap</button>
+      <button id="saveBtn">💾 Kaydet</button>
+      <button id="clearBtn">♻️ Temizle (bu hafta)</button>
+    </div>
+  </div>
 
-  <button id="saveAttendance">Katılımı Kaydet</button>
+  <div class="card">
+    <h2 style="margin:0 0 10px">Oyuncular</h2>
+    <div id="list" class="list"></div>
+  </div>
 
-  <script src="js/storage.js"></script>
-  <script src="js/attendance.js"></script>
+  <p class="meta">Not: Katılım verileri, seçtiğiniz hafta anahtarına göre <code>localStorage</code>’a kaydedilir. <strong>teams.html</strong> ile aynı hafta anahtarını kullandığı için takımlar/katılım eşleşir.</p>
+</div>
+
+<script>
+(function(){
+  const coll = new Intl.Collator('tr-TR', {sensitivity:'base'});
+  const $ = sel => document.querySelector(sel);
+
+  // === Players ===
+  function loadPlayers(){
+    try{
+      const raw = localStorage.getItem('players');
+      if(!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr.filter(p=>p&&p.name).map((p,i)=>({id:p.id??String(i+1), name:String(p.name).trim()})) : [];
+    }catch{ return []; }
+  }
+
+  // === Week key (same style as teams.html) ===
+  function weekKeyFromDate(d){
+    const y = d.getFullYear();
+    const jan1 = new Date(y,0,1);
+    const week = Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7);
+    return `${y}-W${String(week).padStart(2,'0')}`;
+  }
+
+  function fmtDateInput(d){
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${dd}`;
+  }
+
+  function nextMonday(from=new Date()){
+    const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+    const day = d.getDay(); // 0=Sun ... 1=Mon
+    const add = (day===1) ? 0 : ((8 - day) % 7);
+    d.setDate(d.getDate() + add);
+    return d;
+  }
+
+  // === Attendance storage ===
+  function keyForWeek(weekKey){ return 'attendance:'+weekKey; }
+  function loadAttendance(weekKey){
+    try{
+      const raw = localStorage.getItem(keyForWeek(weekKey));
+      if(!raw) return { matchDate:null, responses:{} };
+      const obj = JSON.parse(raw);
+      return { matchDate: obj.matchDate||null, responses: obj.responses||{} };
+    }catch{ return { matchDate:null, responses:{} }; }
+  }
+  function saveAttendance(weekKey, data){
+    localStorage.setItem(keyForWeek(weekKey), JSON.stringify(data));
+    // ayrıca eşleştirme için tarih bilgisini ayrı tutmak isterseniz:
+    localStorage.setItem('matchDate:'+weekKey, data.matchDate||'');
+  }
+
+  // === UI state ===
+  const state = { players:[], date:new Date(), weekKey:'', data:{matchDate:null, responses:{}} };
+
+  function setDateFromInput(value){
+    const parts = String(value||'').split('-').map(Number);
+    if(parts.length===3){
+      state.date = new Date(parts[0], parts[1]-1, parts[2]);
+    } else {
+      state.date = new Date();
+    }
+    state.weekKey = weekKeyFromDate(state.date);
+    state.data = loadAttendance(state.weekKey);
+    // matchDate kaydı yoksa inputtaki değeri yaz
+    if(!state.data.matchDate) state.data.matchDate = fmtDateInput(state.date);
+    $('#weekKey').textContent = state.weekKey;
+    renderList();
+    updateCounts();
+  }
+
+  function updateCounts(){
+    const r = state.data.responses || {};
+    let yes=0,no=0,pending=0;
+    state.players.forEach(p=>{
+      const v = r[p.id];
+      if(v==='in') yes++;
+      else if(v==='out') no++;
+      else pending++;
+    });
+    $('#yesCount').textContent=yes;
+    $('#noCount').textContent=no;
+    $('#pendingCount').textContent=pending;
+  }
+
+  function renderList(){
+    const host = $('#list'); host.innerHTML='';
+    const players = state.players.slice().sort((a,b)=> coll.compare(a.name,b.name));
+    players.forEach(p=>{
+      const row = document.createElement('div'); row.className='item';
+
+      const name = document.createElement('div'); name.textContent=p.name;
+
+      const yes = document.createElement('input'); yes.type='radio'; yes.name='r_'+p.id; yes.id='in_'+p.id;
+      const no  = document.createElement('input'); no.type='radio';  no.name='r_'+p.id; no.id='out_'+p.id;
+
+      const yesL = document.createElement('label'); yesL.htmlFor=yes.id; yesL.textContent='Katılıyorum';
+      const noL  = document.createElement('label'); noL.htmlFor=no.id;  noL.textContent='Katılmıyorum';
+
+      const note = document.createElement('input'); note.type='text'; note.placeholder='Not (opsiyonel)';
+
+      // set current
+      const cur = (state.data.responses||{})[p.id];
+      if(cur==='in') yes.checked=true;
+      else if(cur==='out') no.checked=true;
+      const noteKey = 'attendanceNote:'+state.weekKey+':'+p.id;
+      try{ note.value = localStorage.getItem(noteKey) || ''; }catch{}
+
+      function setStatus(val){
+        state.data.responses = state.data.responses || {};
+        state.data.responses[p.id] = val;
+        updateCounts();
+      }
+      yes.addEventListener('change',()=> setStatus('in'));
+      no.addEventListener('change',()=> setStatus('out'));
+
+      note.addEventListener('change',()=>{
+        try{ localStorage.setItem(noteKey, note.value||''); }catch{}
+      });
+
+      // layout cells
+      const yesWrap=document.createElement('div'); yesWrap.appendChild(yes); yesWrap.appendChild(yesL);
+      const noWrap=document.createElement('div'); noWrap.appendChild(no); noWrap.appendChild(noL);
+
+      row.appendChild(name);
+      row.appendChild(yesWrap);
+      row.appendChild(noWrap);
+      row.appendChild(note);
+      host.appendChild(row);
+    });
+  }
+
+  // === Events ===
+  $('#matchDate').addEventListener('change', (e)=>{
+    setDateFromInput(e.target.value);
+    state.data.matchDate = e.target.value;
+  });
+  $('#allYes').addEventListener('click', ()=>{
+    state.players.forEach(p=> state.data.responses[p.id]='in'); renderList(); updateCounts();
+  });
+  $('#allNo').addEventListener('click', ()=>{
+    state.players.forEach(p=> state.data.responses[p.id]='out'); renderList(); updateCounts();
+  });
+  $('#saveBtn').addEventListener('click', ()=>{
+    saveAttendance(state.weekKey, state.data);
+    alert('Kaydedildi');
+  });
+  $('#clearBtn').addEventListener('click', ()=>{
+    if(!confirm('Bu haftanın katılımını temizlemek istiyor musunuz?')) return;
+    state.data = { matchDate: fmtDateInput(state.date), responses:{} };
+    renderList(); updateCounts(); saveAttendance(state.weekKey, state.data);
+  });
+
+  // === Init ===
+  state.players = loadPlayers();
+  document.getElementById('playerCount').textContent = state.players.length;
+
+  // Son seçilen tarih varsa onu kullan, yoksa yaklaşan Pazartesi
+  const last = localStorage.getItem('attendance:lastDate');
+  const initDate = last ? new Date(last) : nextMonday(new Date());
+  $('#matchDate').value = fmtDateInput(initDate);
+  localStorage.setItem('attendance:lastDate', $('#matchDate').value);
+
+  setDateFromInput($('#matchDate').value);
+})();
+</script>
 </body>
 </html>

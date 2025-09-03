@@ -2,22 +2,125 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Oyuncu Listesi</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KickoffManager — Oyuncular</title>
+  <style>
+    :root{--bg:#0b1220;--panel:#121a2b;--muted:#b7c4df;--ink:#e6ebf3;--line:#1f2a44;--ok:#3ddc97;--bad:#ff6b6b}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+    .wrap{max-width:900px;margin:0 auto;padding:20px}
+    h1{margin:0 0 8px}
+    .help{color:var(--muted);font-size:13px;margin-bottom:14px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:16px}
+    label{color:var(--muted);font-size:14px}
+    input,button{background:#0f172a;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+    input{width:100%}
+    button{cursor:pointer}
+    .row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-top:8px}
+    .list{display:flex;flex-direction:column;gap:10px}
+    .item{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center}
+    .tag{font-size:11px;color:#c6d3f1;background:#0f172a;border:1px solid #1f2a44;border-radius:8px;padding:2px 6px}
+    .muted{color:var(--muted)}
+    .msg{font-size:13px;margin-top:6px}
+    .msg.ok{color:var(--ok)} .msg.err{color:var(--bad)}
+  </style>
 </head>
 <body>
-  <h1>Oyuncu Yönetimi</h1>
-  
-  <form id="playerForm">
-    <input type="text" id="playerName" placeholder="Oyuncu adı" required />
-    <button type="submit">Ekle</button>
-  </form>
+<div class="wrap">
+  <h1>👥 Oyuncular</h1>
+  <p class="help">Aynı adla oyuncu eklenemez veya yeniden adlandırılamaz. Karşılaştırma büyük/küçük harf ve fazla boşlukları yok sayar.</p>
 
-  <ul id="playerList"></ul>
+  <div class="card">
+    <label for="newName">Yeni oyuncu</label>
+    <div class="row">
+      <input id="newName" type="text" placeholder="Ad Soyad" />
+      <button id="addBtn">➕ Ekle</button>
+    </div>
+    <div id="addMsg" class="msg"></div>
+  </div>
 
-  <script src="js/storage.js"></script>
-  <script src="js/players.js"></script>
+  <div class="card">
+    <h2 style="margin:0 0 12px">Kayıtlı Oyuncular</h2>
+    <div id="dupWarn" class="msg err"></div>
+    <div id="list" class="list"></div>
+    <p class="muted" style="margin-top:10px">Not: Atamalar oyuncu <em>ID</em>’siyle tutulur; ismi değiştirince takımlar bozulmaz.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  const coll = new Intl.Collator('tr-TR', {sensitivity:'base'});
+  const norm = s => (s||'').toLowerCase().replace(/\s+/g,' ').trim();
+
+  function load(){ try{ return JSON.parse(localStorage.getItem('players')||'[]'); }catch{ return []; } }
+  function save(list){ localStorage.setItem('players', JSON.stringify(list)); }
+
+  function existsName(name, exceptId=null){
+    const n = norm(name);
+    if(!n) return false;
+    return load().some(p => norm(p.name)===n && p.id!==exceptId);
+  }
+
+  function add(name){
+    name = String(name||'').trim();
+    if(!name) return {ok:false,msg:'İsim boş olamaz.'};
+    if(existsName(name)) return {ok:false,msg:'Bu isim zaten var.'};
+    const arr = load(); arr.push({id:'p'+Date.now(), name}); save(arr);
+    return {ok:true,msg:'Eklendi.'};
+  }
+
+  function rename(id, name){
+    name = String(name||'').trim();
+    if(!name) return {ok:false,msg:'İsim boş olamaz.'};
+    if(existsName(name, id)) return {ok:false,msg:'Bu isim zaten var.'};
+    const arr = load(); const p = arr.find(x=>x.id===id);
+    if(!p) return {ok:false,msg:'Kayıt bulunamadı.'};
+    p.name = name; save(arr); return {ok:true,msg:'Güncellendi.'};
+  }
+
+  function remove(id){ save(load().filter(p=>p.id!==id)); }
+
+  function render(){
+    const list = document.getElementById('list');
+    const warn = document.getElementById('dupWarn');
+    list.innerHTML = '';
+    const arr = load().slice().sort((a,b)=>coll.compare(a.name,b.name));
+
+    // güvenlik: var olan mükerrerleri uyar
+    const seen=new Map(); let dups=0;
+    arr.forEach(p=>{ const n=norm(p.name); if(n && seen.has(n)) dups++; else seen.set(n,true); });
+    warn.textContent = dups ? `⚠️ ${dups} mükerrer isim var. Lütfen düzeltin.` : '';
+
+    arr.forEach(p=>{
+      const row=document.createElement('div'); row.className='item';
+      const name=document.createElement('input'); name.value=p.name;
+      const saveBtn=document.createElement('button'); saveBtn.textContent='💾 Kaydet';
+      const delBtn=document.createElement('button'); delBtn.textContent='🗑️ Sil';
+      const idTag=document.createElement('span'); idTag.className='tag'; idTag.textContent=p.id;
+
+      const nameWrap=document.createElement('div');
+      nameWrap.style.display='flex'; nameWrap.style.gap='8px'; nameWrap.style.alignItems='center';
+      nameWrap.appendChild(name); nameWrap.appendChild(idTag);
+
+      row.appendChild(nameWrap); row.appendChild(saveBtn); row.appendChild(delBtn);
+      list.appendChild(row);
+
+      saveBtn.onclick=()=>{ const r=rename(p.id,name.value); alert(r.msg); if(r.ok) render(); };
+      delBtn.onclick=()=>{ if(confirm('Silinsin mi?')){ remove(p.id); render(); } };
+    });
+  }
+
+  document.getElementById('addBtn').onclick=()=>{
+    const inp=document.getElementById('newName');
+    const res=add(inp.value);
+    const msg=document.getElementById('addMsg');
+    msg.className='msg '+(res.ok?'ok':'err'); msg.textContent=res.msg;
+    if(res.ok){ inp.value=''; render(); }
+  };
+
+  render();
+})();
+</script>
 </body>
 </html>
